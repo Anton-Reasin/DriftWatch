@@ -1,0 +1,25 @@
+# Ignore everything by default, then allow the project sources.
+*
+
+!DriftWatch/
+!DriftWatch/**
+!DriftWatch.xcodeproj/
+!DriftWatch.xcodeproj/**
+!README.md
+!LICENSE
+!.gitignore
+
+# Xcode user data and build output
+DriftWatch.xcodeproj/xcuserdata/
+DriftWatch.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+*.xcscmblueprint
+build/
+DerivedData/
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
