@@ -34,4 +34,22 @@ struct TickTests {
 
         #expect(a + b == Decimal(string: "0.99999999")!)
     }
+
+    @Test("remembers its source and defaults to the live stream")
+    func tracksSource() {
+        let resynced = Tick(
+            symbol: Symbol("BTCUSDT"),
+            price: Decimal(string: "70000")!,
+            time: Date(timeIntervalSince1970: 1_700_000_000),
+            source: .restResync
+        )
+        #expect(resynced.source == .restResync)
+
+        let live = Tick(
+            symbol: Symbol("BTCUSDT"),
+            price: Decimal(string: "70000")!,
+            time: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        #expect(live.source == .stream)
+    }
 }

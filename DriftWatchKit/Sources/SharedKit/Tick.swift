@@ -14,9 +14,21 @@ public struct Tick: Sendable, Hashable {
     /// When the observation happened.
     public let time: Date
 
-    public init(symbol: Symbol, price: Decimal, time: Date) {
+    /// Where the price came from: the live stream or a post-reconnect resync.
+    public let source: TickSource
+
+    // A public initializer is required because the compiler-generated memberwise
+    // init is internal: consumers in the app target could not build a Tick across
+    // the package boundary without it. The default keeps live ticks terse.
+    public init(
+        symbol: Symbol,
+        price: Decimal,
+        time: Date,
+        source: TickSource = .stream
+    ) {
         self.symbol = symbol
         self.price = price
         self.time = time
+        self.source = source
     }
 }
