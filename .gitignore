@@ -5,6 +5,8 @@
 !DriftWatch/**
 !DriftWatch.xcodeproj/
 !DriftWatch.xcodeproj/**
+!DriftWatchKit/
+!DriftWatchKit/**
 !README.md
 !LICENSE
 !.gitignore
