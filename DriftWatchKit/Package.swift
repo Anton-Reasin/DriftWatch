@@ -12,10 +12,16 @@ let package = Package(
     ],
     products: [
         .library(name: "SharedKit", targets: ["SharedKit"]),
+        .library(name: "MarketDomain", targets: ["MarketDomain"]),
     ],
     targets: [
         // Sendable value types shared across every layer. No dependencies.
         .target(name: "SharedKit"),
         .testTarget(name: "SharedKitTests", dependencies: ["SharedKit"]),
+
+        // Domain layer: ports (protocols) and logic over the shared types.
+        // Depends on SharedKit only; cannot reach SwiftUI or networking.
+        .target(name: "MarketDomain", dependencies: ["SharedKit"]),
+        .testTarget(name: "MarketDomainTests", dependencies: ["MarketDomain"]),
     ]
 )
