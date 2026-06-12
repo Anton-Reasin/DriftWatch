@@ -31,4 +31,29 @@ struct FakeTransportTests {
 
         #expect(received == [first, second])
     }
+
+    @Test("injects a reconnect after the given number of ticks")
+    func injectsReconnect() async {
+        let ticks = (1...3).map { i in
+            Tick(
+                symbol: Symbol("BTCUSDT"),
+                price: Decimal(i),
+                time: Date(timeIntervalSince1970: TimeInterval(i))
+            )
+        }
+        let transport = FakeTransport(ticks: ticks, dropConnectionAfter: 2)
+
+        await transport.connect()
+
+        var kinds: [String] = []
+        for await event in transport.events() {
+            switch event {
+            case .tick: kinds.append("tick")
+            case .status(.reconnecting): kinds.append("reconnecting")
+            default: kinds.append("other")
+            }
+        }
+
+        #expect(kinds == ["tick", "tick", "reconnecting", "tick"])
+    }
 }
