@@ -6,10 +6,10 @@ import SharedKit
 /// the event stream in order, then finishes. No network, fully deterministic,
 /// so tests can assert exactly what comes out.
 ///
-/// It can also inject chaos: pass `dropConnectionAfter` to emit a reconnect
-/// status mid-stream, which lets tests check the feed survives a drop. This is
-/// a simple model on purpose; real backoff and retries live in the live
-/// transport later.
+/// It can also inject a reconnect: pass `dropConnectionAfter` to emit a
+/// reconnecting-then-live pair after that many ticks, modelling a drop and its
+/// restore. A drop scripted at `ticks.count` lands after the last tick. Simple
+/// on purpose; real backoff and retries live in the live transport later.
 ///
 /// Unlike the live transport, this one finishes its stream when the script
 /// runs out - that is the "transport is done for good" case from the port's
@@ -34,14 +34,24 @@ public actor FakeTransport: MarketTransport {
     }
 
     public func connect() async {
-        var delivered = 0
-        for tick in ticks {
-            if delivered == dropConnectionAfter {
-                continuation.yield(.status(.reconnecting))
+        for (index, tick) in ticks.enumerated() {
+            if index == dropConnectionAfter {
+                yieldReconnect()
             }
             continuation.yield(.tick(tick))
-            delivered += 1
+        }
+        // A drop scripted at ticks.count lands after the last tick, which lets a
+        // test drive a resync with no live tick racing it.
+        if dropConnectionAfter == ticks.count {
+            yieldReconnect()
         }
         continuation.finish()
+    }
+
+    // Models a drop and its restore: the consumer marks the reconnect on the
+    // first status and runs a resync on the second.
+    private func yieldReconnect() {
+        continuation.yield(.status(.reconnecting))
+        continuation.yield(.status(.live))
     }
 }

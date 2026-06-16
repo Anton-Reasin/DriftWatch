@@ -32,7 +32,7 @@ struct FakeTransportTests {
         #expect(received == [first, second])
     }
 
-    @Test("injects a reconnect after the given number of ticks")
+    @Test("injects a reconnecting-then-live pair after the given number of ticks")
     func injectsReconnect() async {
         let ticks = (1...3).map { i in
             Tick(
@@ -50,10 +50,11 @@ struct FakeTransportTests {
             switch event {
             case .tick: kinds.append("tick")
             case .status(.reconnecting): kinds.append("reconnecting")
+            case .status(.live): kinds.append("live")
             default: kinds.append("other")
             }
         }
 
-        #expect(kinds == ["tick", "tick", "reconnecting", "tick"])
+        #expect(kinds == ["tick", "tick", "reconnecting", "live", "tick"])
     }
 }
