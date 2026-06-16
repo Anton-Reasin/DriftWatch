@@ -64,9 +64,17 @@ cd DriftWatch
 open DriftWatch.xcodeproj
 ```
 
-Pick an iPhone simulator and run. No API key or account needed: the app talks to
-the public Binance stream out of the box. If the live stream is blocked on your
-network, a fake transport can drive the app with scripted ticks.
+Pick an iPhone simulator and run. The app target is still a stub while the core
+is built out in the package; to see the working parts today, run the tests:
+
+```
+cd DriftWatchKit
+swift test
+```
+
+The target stays the same: no API key or account, the app will talk to the
+public Binance stream out of the box, and a fake transport with scripted ticks
+will drive it when the live stream is blocked.
 
 ## Architecture notes
 
