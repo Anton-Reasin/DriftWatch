@@ -10,6 +10,10 @@ import SharedKit
 /// status mid-stream, which lets tests check the feed survives a drop. This is
 /// a simple model on purpose; real backoff and retries live in the live
 /// transport later.
+///
+/// Unlike the live transport, this one finishes its stream when the script
+/// runs out - that is the "transport is done for good" case from the port's
+/// contract, and it is what lets a test's `for await` loop end on its own.
 public actor FakeTransport: MarketTransport {
     private let ticks: [Tick]
     private let dropConnectionAfter: Int?
