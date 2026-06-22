@@ -10,7 +10,9 @@ is the WebSocket pipeline: a live stream, an actor that matches rules as ticks
 arrive, and the concurrency care it takes to never fire a stale or duplicate
 alert.
 
-![DriftWatch main screen](docs/screenshots/main.png)
+| Live price and alert band | Set your own bounds |
+| :---: | :---: |
+| <img src="docs/screenshots/chart.png" width="250px" /> | <img src="docs/screenshots/main.png" width="250px" /> |
 
 ## What works today
 
@@ -21,8 +23,6 @@ alert.
 - Two band modes. Auto keeps a 0.1% band and re-anchors it on each fire, so it
   alerts on every step the price drifts. Manual lets you type your own lines.
 - A connection badge: connecting, live, reconnecting, offline.
-
-![Live chart with the alert band](docs/screenshots/chart.png)
 
 ## Why it exists
 
