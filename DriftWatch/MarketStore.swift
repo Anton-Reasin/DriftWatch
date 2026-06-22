@@ -44,24 +44,34 @@ final class MarketStore {
             }
             let producer = Task { await source.connect() }
             defer { producer.cancel() }
-            var bandArmed = false
+            let upperID = UUID()
+            let lowerID = UUID()
+            @MainActor func arm(_ price: Decimal, _ symbol: Symbol) async {
+                guard let band else { return }
+                let upper = price * (1 + band)
+                let lower = price * (1 - band)
+                self?.bandUpper = upper
+                self?.bandLower = lower
+                await engine.add(
+                    Rule(id: upperID, symbol: symbol, comparator: .greaterThan, threshold: upper))
+                await engine.add(
+                    Rule(id: lowerID, symbol: symbol, comparator: .lessThan, threshold: lower))
+            }
+            var armed = false
             for await event in source.events() {
                 switch event {
                 case .tick(let tick):
-                    if let band, !bandArmed {
-                        bandArmed = true
-                        let upper = tick.price * (1 + band)
-                        let lower = tick.price * (1 - band)
-                        self?.bandUpper = upper
-                        self?.bandLower = lower
-                        await engine.add(
-                            Rule(symbol: tick.symbol, comparator: .greaterThan, threshold: upper))
-                        await engine.add(
-                            Rule(symbol: tick.symbol, comparator: .lessThan, threshold: lower))
+                    if !armed {
+                        armed = true
+                        await arm(tick.price, tick.symbol)
                     }
                     self?.record(tick.price)
-                    for alert in await engine.ingest(tick) {
+                    let fired = await engine.ingest(tick)
+                    for alert in fired {
                         self?.alerts.insert(alert, at: 0)
+                    }
+                    if !fired.isEmpty {
+                        await arm(tick.price, tick.symbol)
                     }
                 case .status(let status):
                     self?.connection = status
