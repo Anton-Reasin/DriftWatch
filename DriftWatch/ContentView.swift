@@ -50,19 +50,7 @@ struct ContentView: View {
             PriceChart(prices: store.priceHistory, upper: store.bandUpper, lower: store.bandLower)
                 .frame(height: 200)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(.black)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .shadow(color: .cyan.opacity(0.22), radius: 22)
-        .shadow(color: .white.opacity(0.08), radius: 10)
+        .glowCard()
     }
 
     // MARK: - Alerts
@@ -85,11 +73,7 @@ struct ContentView: View {
                 }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
+        .glowCard()
     }
 }
 
@@ -188,6 +172,7 @@ private struct PriceChart: View {
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
             .chartYScale(domain: yDomain)
+            .chartXScale(domain: 0...((points.count - 1) * 2))
         }
     }
 
@@ -313,11 +298,7 @@ private struct BoundsEditor: View {
                 .buttonStyle(.bordered)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
+        .glowCard()
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -368,6 +349,25 @@ private struct BoundsEditor: View {
 
     private func formatted(_ value: Decimal) -> String {
         value.formatted(.number.precision(.fractionLength(2)).grouping(.never))
+    }
+}
+
+private extension View {
+    func glowCard() -> some View {
+        self
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(.black)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .shadow(color: .cyan.opacity(0.22), radius: 18)
+            .shadow(color: .white.opacity(0.06), radius: 8)
     }
 }
 
