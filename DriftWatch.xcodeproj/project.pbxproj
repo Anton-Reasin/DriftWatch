@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3E503EB92FE455B600239315 /* MarketDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 3E503EB82FE455B600239315 /* MarketDomain */; };
+		3E503EBB2FE455B600239315 /* SharedKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3E503EBA2FE455B600239315 /* SharedKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		3E37D3E32FCB773B00F454E7 /* DriftWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DriftWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3E503EBB2FE455B600239315 /* SharedKit in Frameworks */,
+				3E503EB92FE455B600239315 /* MarketDomain in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = DriftWatch;
 			packageProductDependencies = (
+				3E503EB82FE455B600239315 /* MarketDomain */,
+				3E503EBA2FE455B600239315 /* SharedKit */,
 			);
 			productName = DriftWatch;
 			productReference = 3E37D3E32FCB773B00F454E7 /* DriftWatch.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = 3E37D3DA2FCB773A00F454E7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				3E503EB72FE455B600239315 /* XCLocalSwiftPackageReference "DriftWatchKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3E37D3E42FCB773B00F454E7 /* Products */;
 			projectDirPath = "";
@@ -346,6 +358,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		3E503EB72FE455B600239315 /* XCLocalSwiftPackageReference "DriftWatchKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = DriftWatchKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3E503EB82FE455B600239315 /* MarketDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MarketDomain;
+		};
+		3E503EBA2FE455B600239315 /* SharedKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SharedKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3E37D3DB2FCB773A00F454E7 /* Project object */;
 }
