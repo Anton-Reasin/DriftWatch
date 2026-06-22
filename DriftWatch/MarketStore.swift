@@ -18,18 +18,25 @@ final class MarketStore {
     private let engine: RulesEngine
     private let rules: [Rule]
     private let band: Decimal?
+    private let symbol: Symbol
+    private let upperRuleID = UUID()
+    private let lowerRuleID = UUID()
+    private var manualBounds = false
+    private var armed = false
     private var dataStream: Task<Void, Never>?
 
     init(
         source: any PriceSource,
         engine: RulesEngine,
         rules: [Rule] = [],
-        band: Decimal? = nil
+        band: Decimal? = nil,
+        symbol: Symbol = Symbol("BTCUSDT")
     ) {
         self.source = source
         self.engine = engine
         self.rules = rules
         self.band = band
+        self.symbol = symbol
     }
 
     func start() {
@@ -37,47 +44,65 @@ final class MarketStore {
         let source = source
         let engine = engine
         let rules = rules
-        let band = band
         dataStream = Task { [weak self] in
             for rule in rules {
                 await engine.add(rule)
             }
             let producer = Task { await source.connect() }
             defer { producer.cancel() }
-            let upperID = UUID()
-            let lowerID = UUID()
-            @MainActor func arm(_ price: Decimal, _ symbol: Symbol) async {
-                guard let band else { return }
-                let upper = price * (1 + band)
-                let lower = price * (1 - band)
-                self?.bandUpper = upper
-                self?.bandLower = lower
-                await engine.add(
-                    Rule(id: upperID, symbol: symbol, comparator: .greaterThan, threshold: upper))
-                await engine.add(
-                    Rule(id: lowerID, symbol: symbol, comparator: .lessThan, threshold: lower))
-            }
-            var armed = false
             for await event in source.events() {
-                switch event {
-                case .tick(let tick):
-                    if !armed {
-                        armed = true
-                        await arm(tick.price, tick.symbol)
-                    }
-                    self?.record(tick.price)
-                    let fired = await engine.ingest(tick)
-                    for alert in fired {
-                        self?.alerts.insert(alert, at: 0)
-                    }
-                    if !fired.isEmpty {
-                        await arm(tick.price, tick.symbol)
-                    }
-                case .status(let status):
-                    self?.connection = status
-                }
+                await self?.handle(event)
             }
         }
+    }
+
+    private func handle(_ event: TransportEvent) async {
+        switch event {
+        case .tick(let tick):
+            if !armed, !manualBounds {
+                armed = true
+                await armBand(around: tick.price)
+            }
+            record(tick.price)
+            let fired = await engine.ingest(tick)
+            for alert in fired {
+                alerts.insert(alert, at: 0)
+            }
+            if !fired.isEmpty, !manualBounds {
+                await armBand(around: tick.price)
+            }
+        case .status(let status):
+            connection = status
+        }
+    }
+
+    private func armBand(around price: Decimal) async {
+        guard let band else { return }
+        let upper = price * (1 + band)
+        let lower = price * (1 - band)
+        bandUpper = upper
+        bandLower = lower
+        await engine.add(
+            Rule(id: upperRuleID, symbol: symbol, comparator: .greaterThan, threshold: upper))
+        await engine.add(
+            Rule(id: lowerRuleID, symbol: symbol, comparator: .lessThan, threshold: lower))
+    }
+
+    /// Replaces the auto drift band with user-set alert lines.
+    func setBounds(upper: Decimal, lower: Decimal) async {
+        manualBounds = true
+        bandUpper = upper
+        bandLower = lower
+        await engine.add(
+            Rule(id: upperRuleID, symbol: symbol, comparator: .greaterThan, threshold: upper))
+        await engine.add(
+            Rule(id: lowerRuleID, symbol: symbol, comparator: .lessThan, threshold: lower))
+    }
+
+    /// Returns to the automatic band that re-anchors on each fire.
+    func useAutoBounds() {
+        manualBounds = false
+        armed = false
     }
 
     func stop() {

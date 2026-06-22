@@ -12,6 +12,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 20) {
                 priceHeader
                 chartCard
+                BoundsEditor(store: store)
                 alertsCard
             }
             .padding()
@@ -241,6 +242,76 @@ private struct ConnectionBadge: View {
         case .reconnecting: .orange
         case .offline: .red
         }
+    }
+}
+
+// MARK: - Bounds editor
+
+private struct BoundsEditor: View {
+    let store: MarketStore
+    @State private var upperText = ""
+    @State private var lowerText = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Alert bounds")
+                .font(.headline)
+            HStack(spacing: 12) {
+                boundField("Upper", text: $upperText)
+                boundField("Lower", text: $lowerText)
+            }
+            HStack {
+                Button("Apply") { apply() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!isValid)
+                Spacer()
+                Button("Auto") { store.useAutoBounds() }
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onChange(of: store.bandUpper) { _, value in
+            if upperText.isEmpty, let value { upperText = formatted(value) }
+        }
+        .onChange(of: store.bandLower) { _, value in
+            if lowerText.isEmpty, let value { lowerText = formatted(value) }
+        }
+    }
+
+    private func boundField(_ title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("0.00", text: text)
+                .keyboardType(.decimalPad)
+                .textFieldStyle(.roundedBorder)
+                .monospacedDigit()
+        }
+    }
+
+    private var upperValue: Decimal? { parse(upperText) }
+    private var lowerValue: Decimal? { parse(lowerText) }
+
+    private var isValid: Bool {
+        guard let upper = upperValue, let lower = lowerValue else { return false }
+        return upper > lower && lower > 0
+    }
+
+    private func apply() {
+        guard let upper = upperValue, let lower = lowerValue else { return }
+        Task { await store.setBounds(upper: upper, lower: lower) }
+    }
+
+    private func parse(_ text: String) -> Decimal? {
+        Decimal(string: text.replacingOccurrences(of: ",", with: "."))
+    }
+
+    private func formatted(_ value: Decimal) -> String {
+        value.formatted(.number.precision(.fractionLength(2)).grouping(.never))
     }
 }
 
