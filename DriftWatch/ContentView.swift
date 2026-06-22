@@ -129,6 +129,10 @@ private struct PriceChart: View {
         return (low - pad)...(high + pad)
     }
 
+    private var fillDepth: Double {
+        (yDomain.upperBound - yDomain.lowerBound) * 0.35
+    }
+
     var body: some View {
         if points.count < 2 {
             placeholder
@@ -137,15 +141,13 @@ private struct PriceChart: View {
                 ForEach(points) { point in
                     AreaMark(
                         x: .value("Sample", point.id),
-                        y: .value("Price", point.value)
+                        yStart: .value("Floor", point.value - fillDepth),
+                        yEnd: .value("Price", point.value)
                     )
                     .interpolationMethod(.catmullRom)
                     .foregroundStyle(
                         LinearGradient(
-                            stops: [
-                                .init(color: .cyan.opacity(0.18), location: 0.0),
-                                .init(color: .cyan.opacity(0.0), location: 0.3)
-                            ],
+                            colors: [.cyan.opacity(0.45), .cyan.opacity(0.0)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
