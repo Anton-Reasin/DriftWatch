@@ -10,9 +10,7 @@ is the WebSocket pipeline: a live stream, an actor that matches rules as ticks
 arrive, and the concurrency care it takes to never fire a stale or duplicate
 alert.
 
-| Live price and alert band | Set your own bounds |
-| :---: | :---: |
-| <img src="docs/screenshots/chart.png" width="250px" /> | <img src="docs/screenshots/main.png" width="250px" /> |
+<p align="center"><img src="docs/screenshots/main.png" width="260px" alt="DriftWatch live screen" /></p>
 
 ## What works today
 
