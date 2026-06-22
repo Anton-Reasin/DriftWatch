@@ -21,7 +21,7 @@ final class MarketStore {
     private let symbol: Symbol
     private let upperRuleID = UUID()
     private let lowerRuleID = UUID()
-    private var manualBounds = false
+    private(set) var manualBounds = false
     private var armed = false
     private var dataStream: Task<Void, Never>?
 

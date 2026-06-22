@@ -249,39 +249,60 @@ private struct ConnectionBadge: View {
 
 private struct BoundsEditor: View {
     let store: MarketStore
+
+    private enum Field {
+        case upper
+        case lower
+    }
+
     @State private var upperText = ""
     @State private var lowerText = ""
+    @State private var prefilled = false
+    @FocusState private var focus: Field?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Alert bounds")
-                .font(.headline)
+            HStack {
+                Text("Alert bounds")
+                    .font(.headline)
+                Spacer()
+                if store.manualBounds {
+                    Text("Manual")
+                        .font(.caption.bold())
+                        .foregroundStyle(.blue)
+                }
+            }
             HStack(spacing: 12) {
-                boundField("Upper", text: $upperText)
-                boundField("Lower", text: $lowerText)
+                boundField("Upper", text: $upperText, field: .upper)
+                boundField("Lower", text: $lowerText, field: .lower)
             }
             HStack {
                 Button("Apply") { apply() }
                     .buttonStyle(.borderedProminent)
                     .disabled(!isValid)
                 Spacer()
-                Button("Auto") { store.useAutoBounds() }
-                    .buttonStyle(.bordered)
+                Button("Auto") {
+                    focus = nil
+                    store.useAutoBounds()
+                }
+                .buttonStyle(.bordered)
             }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .onChange(of: store.bandUpper) { _, value in
-            if upperText.isEmpty, let value { upperText = formatted(value) }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { apply() }
+            }
         }
-        .onChange(of: store.bandLower) { _, value in
-            if lowerText.isEmpty, let value { lowerText = formatted(value) }
-        }
+        .onChange(of: store.bandUpper) { prefill() }
+        .onAppear { prefill() }
     }
 
-    private func boundField(_ title: String, text: Binding<String>) -> some View {
+    private func boundField(_ title: String, text: Binding<String>, field: Field) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption)
@@ -290,6 +311,7 @@ private struct BoundsEditor: View {
                 .keyboardType(.decimalPad)
                 .textFieldStyle(.roundedBorder)
                 .monospacedDigit()
+                .focused($focus, equals: field)
         }
     }
 
@@ -302,8 +324,16 @@ private struct BoundsEditor: View {
     }
 
     private func apply() {
+        focus = nil
         guard let upper = upperValue, let lower = lowerValue else { return }
         Task { await store.setBounds(upper: upper, lower: lower) }
+    }
+
+    private func prefill() {
+        guard !prefilled else { return }
+        if let upper = store.bandUpper { upperText = formatted(upper) }
+        if let lower = store.bandLower { lowerText = formatted(lower) }
+        if store.bandUpper != nil { prefilled = true }
     }
 
     private func parse(_ text: String) -> Decimal? {
