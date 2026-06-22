@@ -19,6 +19,7 @@ struct ContentView: View {
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .task { store.start() }
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Header
@@ -58,6 +59,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
     }
 
     // MARK: - Alerts
@@ -84,6 +86,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -158,6 +161,20 @@ private struct PriceChart: View {
                     RuleMark(y: .value("Lower", lowerValue))
                         .foregroundStyle(.red.opacity(0.6))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                }
+                if let last = points.last {
+                    PointMark(
+                        x: .value("Sample", last.id),
+                        y: .value("Price", last.value)
+                    )
+                    .foregroundStyle(.white)
+                    .symbolSize(190)
+                    PointMark(
+                        x: .value("Sample", last.id),
+                        y: .value("Price", last.value)
+                    )
+                    .foregroundStyle(.blue)
+                    .symbolSize(90)
                 }
             }
             .chartXAxis(.hidden)
@@ -292,6 +309,7 @@ private struct BoundsEditor: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
