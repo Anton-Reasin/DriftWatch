@@ -117,6 +117,10 @@ private struct PriceChart: View {
         (yDomain.upperBound - yDomain.lowerBound) * 0.35
     }
 
+    private var midPoint: Point? {
+        points.isEmpty ? nil : points[points.count / 2]
+    }
+
     var body: some View {
         if points.count < 2 {
             placeholder
@@ -154,16 +158,16 @@ private struct PriceChart: View {
                         .foregroundStyle(.red.opacity(0.6))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
                 }
-                if let last = points.last {
+                if let midPoint {
                     PointMark(
-                        x: .value("Sample", last.id),
-                        y: .value("Price", last.value)
+                        x: .value("Sample", midPoint.id),
+                        y: .value("Price", midPoint.value)
                     )
                     .foregroundStyle(.white)
                     .symbolSize(190)
                     PointMark(
-                        x: .value("Sample", last.id),
-                        y: .value("Price", last.value)
+                        x: .value("Sample", midPoint.id),
+                        y: .value("Price", midPoint.value)
                     )
                     .foregroundStyle(.cyan)
                     .symbolSize(90)
@@ -172,7 +176,6 @@ private struct PriceChart: View {
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
             .chartYScale(domain: yDomain)
-            .chartXScale(domain: 0...((points.count - 1) * 2))
         }
     }
 
