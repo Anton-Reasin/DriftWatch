@@ -143,9 +143,8 @@ private struct PriceChart: View {
                     .foregroundStyle(
                         LinearGradient(
                             stops: [
-                                .init(color: .cyan.opacity(0.32), location: 0.0),
-                                .init(color: .cyan.opacity(0.06), location: 0.45),
-                                .init(color: .cyan.opacity(0.0), location: 0.8)
+                                .init(color: .cyan.opacity(0.18), location: 0.0),
+                                .init(color: .cyan.opacity(0.0), location: 0.3)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
