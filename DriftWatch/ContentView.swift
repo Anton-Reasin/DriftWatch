@@ -11,7 +11,7 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 priceHeader
-                chartCard
+                overviewCard
                 BoundsEditor(store: store)
                 alertsCard
             }
@@ -25,18 +25,11 @@ struct ContentView: View {
     // MARK: - Header
 
     private var priceHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("BTCUSDT")
-                    .font(.title3.bold())
-                    .foregroundStyle(.secondary)
-                Spacer()
-                ConnectionBadge(status: store.connection)
-            }
-            Text(priceText)
-                .font(.system(size: 52, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
+        HStack {
+            Text("BTCUSDT")
+                .font(.title2.bold())
+            Spacer()
+            ConnectionBadge(status: store.connection)
         }
     }
 
@@ -47,19 +40,29 @@ struct ContentView: View {
 
     // MARK: - Chart
 
-    private var chartCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Price")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+    private var overviewCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(priceText)
+                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .foregroundStyle(.white)
             PriceChart(prices: store.priceHistory, upper: store.bandUpper, lower: store.bandLower)
-                .frame(height: 180)
+                .frame(height: 200)
         }
-        .padding()
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(.black)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: .cyan.opacity(0.22), radius: 22)
+        .shadow(color: .white.opacity(0.08), radius: 10)
     }
 
     // MARK: - Alerts
@@ -139,7 +142,11 @@ private struct PriceChart: View {
                     .interpolationMethod(.catmullRom)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue.opacity(0.35), .blue.opacity(0.02)],
+                            stops: [
+                                .init(color: .cyan.opacity(0.32), location: 0.0),
+                                .init(color: .cyan.opacity(0.06), location: 0.45),
+                                .init(color: .cyan.opacity(0.0), location: 0.8)
+                            ],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -149,8 +156,8 @@ private struct PriceChart: View {
                         y: .value("Price", point.value)
                     )
                     .interpolationMethod(.catmullRom)
-                    .foregroundStyle(.blue)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .foregroundStyle(.cyan)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5))
                 }
                 if let upperValue {
                     RuleMark(y: .value("Upper", upperValue))
@@ -173,7 +180,7 @@ private struct PriceChart: View {
                         x: .value("Sample", last.id),
                         y: .value("Price", last.value)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(.cyan)
                     .symbolSize(90)
                 }
             }
