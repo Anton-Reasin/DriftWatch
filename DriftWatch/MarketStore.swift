@@ -10,6 +10,7 @@ final class MarketStore {
     private(set) var latestPrice: Decimal?
     private(set) var alerts: [AlertEvent] = []
     private(set) var connection: ConnectionStatus = .connecting
+    private(set) var priceHistory: [Decimal] = []
 
     private let source: any PriceSource
     private let engine: RulesEngine
@@ -54,7 +55,7 @@ final class MarketStore {
                         await engine.add(
                             Rule(symbol: tick.symbol, comparator: .lessThan, threshold: lower))
                     }
-                    self?.latestPrice = tick.price
+                    self?.record(tick.price)
                     for alert in await engine.ingest(tick) {
                         self?.alerts.insert(alert, at: 0)
                     }
@@ -68,6 +69,14 @@ final class MarketStore {
     func stop() {
         dataStream?.cancel()
         dataStream = nil
+    }
+
+    private func record(_ price: Decimal) {
+        latestPrice = price
+        priceHistory.append(price)
+        if priceHistory.count > 60 {
+            priceHistory.removeFirst()
+        }
     }
 }
 

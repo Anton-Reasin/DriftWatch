@@ -1,3 +1,5 @@
+import Charts
+import Foundation
 import SwiftUI
 
 import SharedKit
@@ -6,59 +8,157 @@ struct ContentView: View {
     let store: MarketStore
 
     var body: some View {
-        VStack(spacing: 24) {
-            priceHeader
-            alertsSection
-            Spacer()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                priceHeader
+                chartCard
+                alertsCard
+            }
+            .padding()
         }
-        .padding()
+        .background(Color(uiColor: .systemGroupedBackground))
         .task { store.start() }
     }
 
+    // MARK: - Header
+
     private var priceHeader: some View {
-        VStack(spacing: 4) {
-            Text("BTCUSDT")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("BTCUSDT")
+                    .font(.title3.bold())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                ConnectionBadge(status: store.connection)
+            }
             Text(priceText)
-                .font(.system(size: 56, weight: .bold, design: .rounded))
+                .font(.system(size: 52, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .contentTransition(.numericText())
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 48)
-    }
-
-    private var alertsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Alerts")
-                .font(.title3.bold())
-            if store.alerts.isEmpty {
-                Text("Waiting for a rule to fire...")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 8)
-            } else {
-                ForEach(store.alerts, id: \.eventID) { alert in
-                    AlertRow(alert: alert)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var priceText: String {
         guard let price = store.latestPrice else { return "..." }
-        return price.formatted(.number.precision(.fractionLength(2)))
+        return price.formatted(.currency(code: "USD").precision(.fractionLength(2)))
+    }
+
+    // MARK: - Chart
+
+    private var chartCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Price")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            PriceChart(prices: store.priceHistory)
+                .frame(height: 180)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    // MARK: - Alerts
+
+    private var alertsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Alerts")
+                .font(.headline)
+            if store.alerts.isEmpty {
+                Text("Waiting for a rule to fire...")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+            } else {
+                ForEach(Array(store.alerts.enumerated()), id: \.element.eventID) { pair in
+                    AlertRow(alert: pair.element)
+                    if pair.offset < store.alerts.count - 1 {
+                        Divider()
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
+
+// MARK: - Price chart
+
+private struct PriceChart: View {
+    let prices: [Decimal]
+
+    private struct Point: Identifiable {
+        let id: Int
+        let value: Double
+    }
+
+    private var points: [Point] {
+        prices.enumerated().map { index, price in
+            Point(id: index, value: NSDecimalNumber(decimal: price).doubleValue)
+        }
+    }
+
+    var body: some View {
+        if points.count < 2 {
+            placeholder
+        } else {
+            Chart(points) { point in
+                AreaMark(
+                    x: .value("Sample", point.id),
+                    y: .value("Price", point.value)
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue.opacity(0.35), .blue.opacity(0.02)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                LineMark(
+                    x: .value("Sample", point.id),
+                    y: .value("Price", point.value)
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(.blue)
+                .lineStyle(StrokeStyle(lineWidth: 2))
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartYScale(domain: .automatic(includesZero: false))
+        }
+    }
+
+    private var placeholder: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(Color.blue.opacity(0.06))
+            .overlay {
+                Text("Collecting prices...")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+    }
+}
+
+// MARK: - Alert row
 
 private struct AlertRow: View {
     let alert: AlertEvent
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(Color.blue.opacity(0.15))
+                    .frame(width: 44, height: 44)
+                Image(systemName: "bell.fill")
+                    .foregroundStyle(.blue)
+            }
+            VStack(alignment: .leading, spacing: 4) {
                 Text(alert.symbol.rawValue)
                     .font(.subheadline.bold())
                 Text(alert.firedAt.formatted(date: .omitted, time: .standard))
@@ -66,10 +166,49 @@ private struct AlertRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(alert.price.formatted(.number.precision(.fractionLength(2))))
-                .font(.subheadline.monospacedDigit())
+            Text(alert.price.formatted(.currency(code: "USD").precision(.fractionLength(2))))
+                .font(.subheadline.monospacedDigit().bold())
         }
         .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Connection badge
+
+private struct ConnectionBadge: View {
+    let status: ConnectionStatus
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+            Text(label)
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color(uiColor: .tertiarySystemBackground))
+        .clipShape(Capsule())
+    }
+
+    private var label: String {
+        switch status {
+        case .connecting: "Connecting"
+        case .live: "Live"
+        case .reconnecting: "Reconnecting"
+        case .offline: "Offline"
+        }
+    }
+
+    private var color: Color {
+        switch status {
+        case .connecting: .orange
+        case .live: .green
+        case .reconnecting: .orange
+        case .offline: .red
+        }
     }
 }
 
