@@ -4,8 +4,8 @@ import Testing
 import SharedKit
 import MarketDomain
 
-@Suite("FakeTransport")
-struct FakeTransportTests {
+@Suite("FakePriceSource")
+struct FakePriceSourceTests {
     @Test("replays the scripted ticks in order")
     func replaysScriptedTicks() async {
         let first = Tick(
@@ -18,12 +18,12 @@ struct FakeTransportTests {
             price: Decimal(string: "70010")!,
             time: Date(timeIntervalSince1970: 2)
         )
-        let transport = FakeTransport(ticks: [first, second])
+        let source = FakePriceSource(ticks: [first, second])
 
-        await transport.connect()
+        await source.connect()
 
         var received: [Tick] = []
-        for await event in transport.events() {
+        for await event in source.events() {
             if case let .tick(tick) = event {
                 received.append(tick)
             }
@@ -41,12 +41,12 @@ struct FakeTransportTests {
                 time: Date(timeIntervalSince1970: TimeInterval(i))
             )
         }
-        let transport = FakeTransport(ticks: ticks, dropConnectionAfter: 2)
+        let source = FakePriceSource(ticks: ticks, dropConnectionAfter: 2)
 
-        await transport.connect()
+        await source.connect()
 
         var kinds: [String] = []
-        for await event in transport.events() {
+        for await event in source.events() {
             switch event {
             case .tick: kinds.append("tick")
             case .status(.reconnecting): kinds.append("reconnecting")

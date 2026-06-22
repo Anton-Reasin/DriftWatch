@@ -29,15 +29,15 @@ struct AlertEventTests {
     // The dedup property that matters: a firing re-detected a few seconds later
     // (reconnect replays the crossing tick) must map to the SAME id, so the
     // feed's unique constraint can drop it. Base time 1_700_000_000 sits 20s
-    // into its minute bucket: +30s stays inside, +61s crosses into the next.
-    @Test("firings within one bucket share the eventID, the next bucket does not")
-    func eventIDBucketsTime() {
+    // into its minute-long interval: +30s stays inside, +61s crosses the next.
+    @Test("firings within one time interval share the eventID, the next does not")
+    func eventIDGroupsByTimeInterval() {
         #expect(event(at: time).eventID == event(at: time).eventID)
         #expect(event(at: time).eventID == event(at: time.addingTimeInterval(30)).eventID)
         #expect(event(at: time).eventID != event(at: time.addingTimeInterval(61)).eventID)
     }
 
-    @Test("different rules never share an eventID, even in the same bucket")
+    @Test("different rules never share an eventID, even in the same time interval")
     func eventIDSeparatesRules() {
         let other = AlertEvent(
             ruleID: UUID(),

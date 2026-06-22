@@ -31,11 +31,11 @@ struct AlertServiceTests {
     func bridgesCrossingTicksToAlerts() async {
         let engine = RulesEngine()
         await engine.add(rule("70000"))
-        let transport = FakeTransport(ticks: [tick("69999"), tick("70001"), tick("70002")])
-        let service = AlertService(transport: transport, engine: engine)
+        let source = FakePriceSource(ticks: [tick("69999"), tick("70001"), tick("70002")])
+        let service = AlertService(source: source, engine: engine)
 
         let alerts = service.alerts()
-        await transport.connect()
+        await source.connect()
 
         var received: [AlertEvent] = []
         for await alert in alerts {
@@ -50,11 +50,11 @@ struct AlertServiceTests {
     func emitsNothingWithoutCrossing() async {
         let engine = RulesEngine()
         await engine.add(rule("70000"))
-        let transport = FakeTransport(ticks: [tick("69998"), tick("69999")])
-        let service = AlertService(transport: transport, engine: engine)
+        let source = FakePriceSource(ticks: [tick("69998"), tick("69999")])
+        let service = AlertService(source: source, engine: engine)
 
         let alerts = service.alerts()
-        await transport.connect()
+        await source.connect()
 
         var received: [AlertEvent] = []
         for await alert in alerts {
@@ -70,10 +70,10 @@ struct AlertServiceTests {
         await engine.add(rule("70000"))
         // One tick below the line, then a drop and restore scripted at the end.
         // The recovered price sits above the line, so only the resync can fire.
-        let transport = FakeTransport(ticks: [tick("69000")], dropConnectionAfter: 1)
+        let source = FakePriceSource(ticks: [tick("69000")], dropConnectionAfter: 1)
         let resync = StubResyncClient(price: Decimal(string: "71000")!)
         let service = AlertService(
-            transport: transport,
+            source: source,
             engine: engine,
             resync: resync,
             symbols: [Symbol("BTCUSDT")],
@@ -81,7 +81,7 @@ struct AlertServiceTests {
         )
 
         let alerts = service.alerts()
-        await transport.connect()
+        await source.connect()
 
         var received: [AlertEvent] = []
         for await alert in alerts {

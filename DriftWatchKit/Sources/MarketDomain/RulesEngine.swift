@@ -1,21 +1,16 @@
 import Foundation
 import SharedKit
 
-/// The heart of the app: holds the user's rules and decides when a price fires one.
-///
-/// All mutable state lives inside this actor, so there is no data race by
-/// construction: only the actor touches `rules`, one call at a time. The hot
-/// path `ingest` is synchronous on purpose (no await): an actor only lets
-/// another call in at a suspension point, so a path without one cannot be
-/// interrupted half-way. The one path that must await - refetching the last
-/// price over REST after a reconnect - comes later and is handled with care.
 public actor RulesEngine {
     private var rules: [UUID: Rule] = [:]
 
-    // Per-symbol reconnect bookkeeping for the resync guard. The epoch counts
-    // reconnects; the flag records whether a live tick has arrived since the
-    // last one. Both are re-read after the resync await to drop a stale price.
+    // Per-symbol reconnect counter for the resync guard. Bumped on each
+    // reconnect, snapshotted before the resync await, and re-checked after, so
+    // a fetch begun for an older connection is recognised as stale.
     private var reconnectEpoch: [Symbol: UInt64] = [:]
+
+    // Whether a live tick has arrived since the last reconnect, per symbol. A
+    // live tick means fresh data already landed, so a resync in flight is stale.
     private var liveTickSeenSinceReconnect: [Symbol: Bool] = [:]
 
     public init() {}

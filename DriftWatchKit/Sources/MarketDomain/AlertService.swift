@@ -1,35 +1,35 @@
 import Foundation
 import SharedKit
 
-/// Drives a rules engine from a market-data transport.
+/// Drives a rules engine from a market-data source.
 ///
-/// Reads the transport's single event feed, hands each tick to the engine, and
+/// Reads the source's single event feed, hands each tick to the engine, and
 /// republishes the alerts that fire as their own stream. It is the one consumer
-/// of the transport feed (the feed is unicast), so it also reacts to connection
+/// of the source feed (the feed is unicast), so it also reacts to connection
 /// status: it marks a reconnect on the engine, then runs a REST resync once the
 /// feed is live again.
 public struct AlertService: Sendable {
-    private let transport: any MarketTransport
+    private let source: any PriceSource
     private let engine: RulesEngine
     private let resync: (any RestResyncClient)?
     private let symbols: [Symbol]
     private let now: @Sendable () -> Date
 
     public init(
-        transport: any MarketTransport,
+        source: any PriceSource,
         engine: RulesEngine,
         resync: (any RestResyncClient)? = nil,
         symbols: [Symbol] = [],
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
-        self.transport = transport
+        self.source = source
         self.engine = engine
         self.resync = resync
         self.symbols = symbols
         self.now = now
     }
 
-    /// A stream of alerts produced by feeding the transport's ticks to the engine.
+    /// A stream of alerts produced by feeding the source's ticks to the engine.
     ///
     /// On a reconnect the engine is marked, and on the following live status a
     /// resync runs per symbol. The resync runs in its own task, alongside the
@@ -37,7 +37,7 @@ public struct AlertService: Sendable {
     /// the race the engine's epoch guard is built for. The stream ends only once
     /// the feed ends and every pending resync has finished, so no alert is lost.
     public func alerts() -> AsyncStream<AlertEvent> {
-        let transport = self.transport
+        let source = self.source
         let engine = self.engine
         let resync = self.resync
         let symbols = self.symbols
@@ -46,7 +46,7 @@ public struct AlertService: Sendable {
             let task = Task {
                 var pendingResyncs: [Task<Void, Never>] = []
                 var awaitingRestore = false
-                for await event in transport.events() {
+                for await event in source.events() {
                     switch event {
                     case .tick(let tick):
                         for alert in await engine.ingest(tick) {
