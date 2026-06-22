@@ -11,6 +11,8 @@ final class MarketStore {
     private(set) var alerts: [AlertEvent] = []
     private(set) var connection: ConnectionStatus = .connecting
     private(set) var priceHistory: [Decimal] = []
+    private(set) var bandUpper: Decimal?
+    private(set) var bandLower: Decimal?
 
     private let source: any PriceSource
     private let engine: RulesEngine
@@ -50,6 +52,8 @@ final class MarketStore {
                         bandArmed = true
                         let upper = tick.price * (1 + band)
                         let lower = tick.price * (1 - band)
+                        self?.bandUpper = upper
+                        self?.bandLower = lower
                         await engine.add(
                             Rule(symbol: tick.symbol, comparator: .greaterThan, threshold: upper))
                         await engine.add(
@@ -71,10 +75,17 @@ final class MarketStore {
         dataStream = nil
     }
 
+    private var lastSampleAt: Date?
+
     private func record(_ price: Decimal) {
         latestPrice = price
+        let now = Date()
+        if let last = lastSampleAt, now.timeIntervalSince(last) < 0.5 {
+            return
+        }
+        lastSampleAt = now
         priceHistory.append(price)
-        if priceHistory.count > 60 {
+        if priceHistory.count > 120 {
             priceHistory.removeFirst()
         }
     }
@@ -85,7 +96,7 @@ extension MarketStore {
         return MarketStore(
             source: PriceSourceBinance(symbols: [Symbol("BTCUSDT")]),
             engine: RulesEngine(),
-            band: Decimal(5) / Decimal(10000)  // 0.05%
+            band: Decimal(1) / Decimal(1000)  // 0.1%
         )
     }
 

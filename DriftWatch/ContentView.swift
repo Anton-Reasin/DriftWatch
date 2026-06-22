@@ -50,7 +50,7 @@ struct ContentView: View {
             Text("Price")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            PriceChart(prices: store.priceHistory)
+            PriceChart(prices: store.priceHistory, upper: store.bandUpper, lower: store.bandLower)
                 .frame(height: 180)
         }
         .padding()
@@ -90,6 +90,8 @@ struct ContentView: View {
 
 private struct PriceChart: View {
     let prices: [Decimal]
+    let upper: Decimal?
+    let lower: Decimal?
 
     private struct Point: Identifiable {
         let id: Int
@@ -102,34 +104,64 @@ private struct PriceChart: View {
         }
     }
 
+    private var upperValue: Double? {
+        upper.map { NSDecimalNumber(decimal: $0).doubleValue }
+    }
+
+    private var lowerValue: Double? {
+        lower.map { NSDecimalNumber(decimal: $0).doubleValue }
+    }
+
+    private var yDomain: ClosedRange<Double> {
+        var values = points.map(\.value)
+        if let upperValue { values.append(upperValue) }
+        if let lowerValue { values.append(lowerValue) }
+        guard let low = values.min(), let high = values.max() else { return 0...1 }
+        guard low < high else { return (low - 1)...(high + 1) }
+        let pad = (high - low) * 0.15
+        return (low - pad)...(high + pad)
+    }
+
     var body: some View {
         if points.count < 2 {
             placeholder
         } else {
-            Chart(points) { point in
-                AreaMark(
-                    x: .value("Sample", point.id),
-                    y: .value("Price", point.value)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.blue.opacity(0.35), .blue.opacity(0.02)],
-                        startPoint: .top,
-                        endPoint: .bottom
+            Chart {
+                ForEach(points) { point in
+                    AreaMark(
+                        x: .value("Sample", point.id),
+                        y: .value("Price", point.value)
                     )
-                )
-                LineMark(
-                    x: .value("Sample", point.id),
-                    y: .value("Price", point.value)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(.blue)
-                .lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.35), .blue.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    LineMark(
+                        x: .value("Sample", point.id),
+                        y: .value("Price", point.value)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(.blue)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                }
+                if let upperValue {
+                    RuleMark(y: .value("Upper", upperValue))
+                        .foregroundStyle(.green.opacity(0.6))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                }
+                if let lowerValue {
+                    RuleMark(y: .value("Lower", lowerValue))
+                        .foregroundStyle(.red.opacity(0.6))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                }
             }
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
-            .chartYScale(domain: .automatic(includesZero: false))
+            .chartYScale(domain: yDomain)
         }
     }
 
