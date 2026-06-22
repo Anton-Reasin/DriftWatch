@@ -34,12 +34,17 @@ public actor PriceSourceBinance: PriceSource {
     }
 
     private func receiveLoop(on task: URLSessionWebSocketTask) async {
+        var announcedLive = false
         while true {
             guard let message = try? await task.receive() else {
                 continuation.yield(.status(.offline))
                 return
             }
             if case .string(let text) = message, let tick = Self.makeTick(from: text) {
+                if !announcedLive {
+                    announcedLive = true
+                    continuation.yield(.status(.live))
+                }
                 continuation.yield(.tick(tick))
             }
         }
