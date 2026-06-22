@@ -1,57 +1,70 @@
 # DriftWatch
 
-Live price alerts for crypto. You set a rule like "BTC above 70000" and the app
-watches the market over a WebSocket feed and fires the moment the price crosses
-your line. No backend, no API key: it connects straight to the Binance public
-market-data stream.
+Realtime crypto price alerts over a Binance WebSocket. Set an upper and a lower
+line; the app watches the live trade stream and fires the moment the price
+crosses your line. No backend, no API key: it connects straight to the Binance
+public market-data stream.
 
-> Status: early development. The core (WebSocket transport, rules engine) is the
-> focus; secondary screens may be mocked while the main feature is built out.
-> Diploma project for the OTUS iOS Developer Professional course.
+Diploma project for the OTUS iOS Developer Professional course. The thesis topic
+is the WebSocket pipeline: a live stream, an actor that matches rules as ticks
+arrive, and the concurrency care it takes to never fire a stale or duplicate
+alert.
+
+![DriftWatch main screen](docs/screenshots/main.png)
+
+## What works today
+
+- Live BTCUSDT price over the Binance combined trade stream.
+- A price chart (Swift Charts) with the alert band drawn as an upper and a lower
+  line, and the live price moving between them.
+- An alert feed: when the price crosses a line, a row lands in the list.
+- Two band modes. Auto keeps a 0.1% band and re-anchors it on each fire, so it
+  alerts on every step the price drifts. Manual lets you type your own lines.
+- A connection badge: connecting, live, reconnecting, offline.
+
+![Live chart with the alert band](docs/screenshots/chart.png)
 
 ## Why it exists
 
-Most "realtime" price apps actually poll a REST endpoint every few seconds, so
-they miss the exact tick that crosses a threshold. DriftWatch listens to the live
-trade stream instead, matches rules locally as ticks arrive, and shows a feed of
-what fired. The interesting part is keeping that stream reliable: reconnect after
-a drop, resync the last price, and never fire a duplicate or a stale alert.
+Most "realtime" price apps poll a REST endpoint every few seconds, so they miss
+the exact tick that crosses a threshold. DriftWatch listens to the live trade
+stream instead and matches rules locally as ticks arrive.
+
+The interesting part is keeping that correct under concurrency. All live rule
+state lives in a Swift `actor`, so there is no data race by construction. The one
+place that awaits is the REST resync after a reconnect, and that is where an
+actor can be re-entered: a live tick can land while the resync is in flight. The
+engine guards it with a per-symbol reconnect epoch and a live-tick flag, so a
+live price always wins over a stale resync and a rule fires exactly once.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    WS[WebSocket frame] --> Tick[Tick]
-    Tick --> Engine[RulesEngine - actor]
+    WS[WebSocket frame] --> Tick[Tick DTO]
+    Tick --> Engine[RulesEngine actor]
     Engine --> Alert[AlertEvent]
-    Engine --> Stats[price stats]
-    Alert --> Feed[(SwiftData feed)]
-    Alert --> UI[live UI]
+    Alert --> Store[MarketStore]
+    Store --> UI[SwiftUI screen]
 ```
 
-<details>
-<summary>Same flow as plain text</summary>
+Plain text: WebSocket frame to Tick to RulesEngine (actor) to AlertEvent to the
+MainActor store to the SwiftUI screen.
 
-```
-WebSocket frame -> Tick -> RulesEngine (actor) -> AlertEvent
-                              -> price stats
-AlertEvent -> SwiftData feed + live UI
-```
-</details>
-
-- Prices arrive over the Binance combined trade stream.
-- An `actor` holds all live rule state, so there is no data race by construction.
-- After a reconnect the engine resyncs the last price over REST, and a live tick
-  always wins over a stale resync (this is the part that needs care).
-- Fired alerts go to a local feed and to the screen at the same time.
+- Prices arrive over the Binance combined trade stream as JSON frames.
+- A `Tick` (a Sendable struct with a `Decimal` price) crosses into the actor.
+- The actor matches every armed rule. The hot path is synchronous, so it cannot
+  be re-entered. Only the post-reconnect resync awaits, and that path is guarded.
+- Fired alerts and the latest price flow to the `@MainActor @Observable` store,
+  and the screen reads it.
 
 ## Stack
 
-- iOS 18, Swift 6 with strict concurrency
-- SwiftUI, `@Observable`
-- Swift Concurrency: actors, `AsyncStream`, structured concurrency
-- SwiftData for the local feed
-- Swift Package Manager for the module split
+- iOS 18, Swift 6 with strict concurrency (`complete`)
+- SwiftUI with an `@Observable` store (MV, no view models)
+- Swift Concurrency: actors, `AsyncStream`, structured concurrency, `[weak self]`
+- Swift Charts for the price chart
+- Swift Package Manager: the domain is a local package, split from the app
 - Swift Testing for unit tests
 
 ## Run it
@@ -64,32 +77,41 @@ cd DriftWatch
 open DriftWatch.xcodeproj
 ```
 
-Pick an iPhone simulator and run. The app target is still a stub while the core
-is built out in the package; to see the working parts today, run the tests:
+Pick an iPhone simulator and run. No API key or account: it connects to the
+public Binance stream out of the box. To run the domain tests:
 
 ```
 cd DriftWatchKit
 swift test
 ```
 
-The target stays the same: no API key or account, the app will talk to the
-public Binance stream out of the box, and a fake transport with scripted ticks
-will drive it when the live stream is blocked.
+## Architecture
 
-## Architecture notes
+The domain logic lives in a local Swift package (`DriftWatchKit`) so the compiler
+enforces the layer boundary: the domain cannot import SwiftUI or networking
+because it does not depend on them. The market data source sits behind a
+`PriceSource` protocol with two conformers, a live Binance one and a fake one
+that replays scripted ticks for tests and the SwiftUI preview.
 
-The domain logic lives in a local Swift package so the compiler enforces the
-layer boundaries: the domain cannot import SwiftUI or networking because it does
-not depend on them. Transport sits behind a protocol with two implementations,
-a live Binance one and a fake one for tests.
+The app layer is a single `@MainActor @Observable` store (`MarketStore`). It runs
+the source, feeds ticks to the engine, keeps a short price history for the chart,
+and exposes the band bounds the screen draws.
+
+## Tests
+
+`swift test` runs 28 tests with Swift Testing. They cover rule matching for each
+comparator, the armed-to-triggered transition, and the reentrancy case: a live
+tick during the REST resync await must win, so the rule fires once and the stale
+resync is dropped. The fake source injects reconnects and scripted prices, so the
+tests stay deterministic with no network.
 
 ## Roadmap
 
-- [ ] WebSocket transport with reconnect, backoff and heartbeat
-- [ ] Rules engine with threshold and percent-move rules
-- [ ] Local feed with dedup and paging
-- [ ] Live chart
+- [ ] Reconnect engine: backoff with jitter, a ping/pong watchdog, and a
+      close-code state machine
+- [ ] SwiftData feed: store fired alerts with dedup and keyset paging
 - [ ] On-device anomaly detector (rolling z-score)
+- [ ] CI: GitHub Actions for build, `swift test`, and `swift format` lint
 
 ## License
 

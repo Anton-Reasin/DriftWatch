@@ -10,6 +10,9 @@
 !README.md
 !LICENSE
 !.gitignore
+!docs/
+!docs/screenshots/
+!docs/screenshots/**
 
 # Xcode user data and build output
 DriftWatch.xcodeproj/xcuserdata/
