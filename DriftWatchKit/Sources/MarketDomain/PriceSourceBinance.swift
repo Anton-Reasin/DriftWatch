@@ -6,13 +6,21 @@ public actor PriceSourceBinance: PriceSource {
     private let symbols: [Symbol]
     private let session: URLSession
     private var task: URLSessionWebSocketTask?
+    private let backoff = Backoff()
+    private let clock: any Clock<Duration>
+    private var attempt = 0
 
     private nonisolated let stream: AsyncStream<TransportEvent>
     private nonisolated let continuation: AsyncStream<TransportEvent>.Continuation
 
-    public init(symbols: [Symbol], session: URLSession = .shared) {
+    public init(
+        symbols: [Symbol],
+        session: URLSession = .shared,
+        clock: any Clock<Duration> = ContinuousClock()
+    ) {
         self.symbols = symbols
         self.session = session
+        self.clock = clock
         (stream, continuation) = AsyncStream.makeStream()
     }
 
@@ -21,28 +29,33 @@ public actor PriceSourceBinance: PriceSource {
     }
 
     public func connect() async {
-        let streamPath = symbols.map(\.streamName).joined(separator: "/")
-        var components = URLComponents(string: "wss://data-stream.binance.vision/stream")!
-        components.queryItems = [URLQueryItem(name: "streams", value: streamPath)]
-        guard let url = components.url else { return }
+        while !Task.isCancelled {
+            let streamPath = symbols.map(\.streamName).joined(separator: "/")
+            var components = URLComponents(string: "wss://data-stream.binance.vision/stream")!
+            components.queryItems = [URLQueryItem(name: "streams", value: streamPath)]
+            guard let url = components.url else { return }
 
-        let task = session.webSocketTask(with: url)
-        self.task = task
-        continuation.yield(.status(.connecting))
-        task.resume()
-        await receiveLoop(on: task)
+            let task = session.webSocketTask(with: url)
+            self.task = task
+            continuation.yield(.status(attempt == 0 ? .connecting : .reconnecting))
+            task.resume()
+            await receiveLoop(on: task)
+            let wait = backoff.delay(for: attempt)
+            attempt += 1
+            try? await clock.sleep(for: wait)
+        }
     }
 
     private func receiveLoop(on task: URLSessionWebSocketTask) async {
         var announcedLive = false
         while true {
             guard let message = try? await task.receive() else {
-                continuation.yield(.status(.offline))
                 return
             }
             if case .string(let text) = message, let tick = Self.makeTick(from: text) {
                 if !announcedLive {
                     announcedLive = true
+                    attempt = 0
                     continuation.yield(.status(.live))
                 }
                 continuation.yield(.tick(tick))
