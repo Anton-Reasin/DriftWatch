@@ -95,18 +95,54 @@ The app layer is a single `@MainActor @Observable` store (`MarketStore`). It run
 the source, feeds ticks to the engine, keeps a short price history for the chart,
 and exposes the band bounds the screen draws.
 
+## Reliability
+
+The live source reconnects on its own. `connect()` runs a loop: open the socket,
+read frames until the stream drops, then wait a backoff delay and reopen. It stops
+only when the consumer cancels.
+
+The delay uses capped exponential backoff with full jitter, the AWS approach. The
+ceiling doubles each attempt from 0.5s up to a 30s cap, and the real delay is a
+random point between zero and that ceiling. The jitter matters: without it, many
+clients that dropped at the same time would all retry at the same instant and hit
+the server in lockstep. `Backoff` is a small value type with unit tests for the
+schedule and the range.
+
+The attempt counter resets to zero only on the first real tick, not when the
+socket opens. A socket can open and die a second later, so resetting on a live
+tick keeps a short-lived connection from wiping the schedule. The status the UI
+reads follows the same path: connecting on the first try, reconnecting while
+retrying, live once a tick arrives.
+
+The wait runs on an injected `Clock`. The app passes the real `ContinuousClock`; a
+test can pass a clock that sleeps instantly, so the reconnect logic stays testable
+without real delays.
+
+This already handles the common cases. Any read error ends the loop body and
+triggers a backoff and retry, including the 24-hour server cut and the
+`serverShutdown` notice Binance sends before a planned close.
+
+Scoped, not built yet:
+
+- A ping/pong watchdog for a half-open socket, where `receive()` blocks with no
+  error because the connection is dead but the OS has not noticed. Send a ping
+  every 20s and treat a missing pong as a drop.
+- Explicit close-code handling, so a close we started does not trigger a retry.
+  Today cancellation already stops the loop, which covers the app-initiated case.
+
 ## Tests
 
-`swift test` runs 28 tests with Swift Testing. They cover rule matching for each
-comparator, the armed-to-triggered transition, and the reentrancy case: a live
-tick during the REST resync await must win, so the rule fires once and the stale
-resync is dropped. The fake source injects reconnects and scripted prices, so the
-tests stay deterministic with no network.
+`swift test` runs 30 tests with Swift Testing. They cover rule matching for each
+comparator, the armed-to-triggered transition, the reentrancy case (a live tick
+during the REST resync await must win, so the rule fires once and the stale resync
+is dropped), and the backoff schedule with its jitter range. The fake source
+injects reconnects and scripted prices, so the tests stay deterministic with no
+network.
 
 ## Roadmap
 
-- [ ] Reconnect engine: backoff with jitter, a ping/pong watchdog, and a
-      close-code state machine
+- [x] Reconnect loop with full-jitter backoff (0.5-30s cap)
+- [ ] Ping/pong watchdog and close-code handling for a half-open socket
 - [ ] SwiftData feed: store fired alerts with dedup and keyset paging
 - [ ] On-device anomaly detector (rolling z-score)
 - [ ] CI: GitHub Actions for build, `swift test`, and `swift format` lint
