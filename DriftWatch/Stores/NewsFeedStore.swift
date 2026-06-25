@@ -14,7 +14,13 @@ final class NewsFeedStore {
 
     private var nextPage: String?
     private var seenIDs = Set<String>()
-    private let service = NewsService()
+    private let source: any NewsSource
+
+    /// Uses the live API when a key is present, the bundled demo feed otherwise,
+    /// so the tab works on a fresh clone. Tests can inject a fake source.
+    init(source: (any NewsSource)? = nil) {
+        self.source = source ?? (AppSecrets.newsDataAPIKey != nil ? NewsService() : DemoNewsSource())
+    }
 
     func loadFirstPage() async {
         guard !isLoading else { return }
@@ -35,7 +41,7 @@ final class NewsFeedStore {
     private func loadPage() async {
         isLoading = true
         do {
-            let page = try await service.page(cursor: nextPage)
+            let page = try await source.page(cursor: nextPage)
             // Drop articles already shown: NewsData can repeat one across pages,
             // and a duplicate id breaks the List's ForEach.
             let fresh = page.items.filter { seenIDs.insert($0.id).inserted }

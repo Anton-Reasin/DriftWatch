@@ -13,8 +13,13 @@ enum NewsError: LocalizedError {
     }
 }
 
+/// A source of paged news: the live API or the bundled demo feed.
+protocol NewsSource: Sendable {
+    func page(cursor: String?) async throws -> NewsPage
+}
+
 /// Loads crypto news from NewsData.io, one page at a time via the API cursor.
-struct NewsService {
+struct NewsService: NewsSource {
     // Read from a gitignored Secrets.plist so the key stays out of the repo.
     // See Secrets.example.plist and the README for setup.
     private let apiKey = AppSecrets.newsDataAPIKey
