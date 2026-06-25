@@ -21,15 +21,29 @@ public actor PriceSourceBinance: PriceSource {
         self.symbols = symbols
         self.session = session
         self.clock = clock
-        (stream, continuation) = AsyncStream.makeStream()
+        (stream, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(256))
     }
 
     public nonisolated func events() -> AsyncStream<TransportEvent> {
         stream
     }
 
+    private var stopped = false
+
+    /// Closes the socket and stops the reconnect loop when the stream's only
+    /// consumer goes away. Without this the WebSocket and backoff loop outlive
+    /// the screen (concurrency rule: AsyncStream wrappers clean up on terminate).
+    private func shutdown() {
+        stopped = true
+        task?.cancel(with: .goingAway, reason: nil)
+        task = nil
+    }
+
     public func connect() async {
-        while !Task.isCancelled {
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.shutdown() }
+        }
+        while !stopped, !Task.isCancelled {
             let streamPath = symbols.map(\.streamName).joined(separator: "/")
             var components = URLComponents(string: "wss://data-stream.binance.vision/stream")!
             components.queryItems = [URLQueryItem(name: "streams", value: streamPath)]
