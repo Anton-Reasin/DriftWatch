@@ -4,7 +4,7 @@ import SwiftUI
 
 import SharedKit
 
-struct ContentView: View {
+struct PriceView: View {
     let store: MarketStore
 
     var body: some View {
@@ -375,5 +375,5 @@ private extension View {
 }
 
 #Preview {
-    ContentView(store: .demo())
+    PriceView(store: .demo())
 }

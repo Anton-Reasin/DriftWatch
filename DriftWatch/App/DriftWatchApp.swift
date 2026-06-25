@@ -6,7 +6,7 @@ struct DriftWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store)
+            RootView(store: store)
         }
     }
 }
