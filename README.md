@@ -1,9 +1,10 @@
 # DriftWatch
 
-Realtime crypto price alerts over a Binance WebSocket. Set an upper and a lower
-line; the app watches the live trade stream and fires the moment the price
-crosses your line. No backend, no API key: it connects straight to the Binance
-public market-data stream.
+Realtime crypto price alerts over a Binance WebSocket, with a persisted alert
+history and a paginated news feed. Set an upper and a lower line; the app watches
+the live trade stream and fires the moment the price crosses your line. No backend
+and no key for the core: it connects straight to the Binance public market-data
+stream.
 
 Diploma project for the OTUS iOS Developer Professional course. The thesis topic
 is the WebSocket pipeline: a live stream, an actor that matches rules as ticks
@@ -14,13 +15,49 @@ alert.
 
 ## What works today
 
+Three tabs.
+
+Price:
+
 - Live BTCUSDT price over the Binance combined trade stream.
-- A price chart (Swift Charts) with the alert band drawn as an upper and a lower
+- A Swift Charts price chart with the alert band drawn as an upper and a lower
   line, and the live price moving between them.
-- An alert feed: when the price crosses a line, a row lands in the list.
-- Two band modes. Auto keeps a 0.1% band and re-anchors it on each fire, so it
-  alerts on every step the price drifts. Manual lets you type your own lines.
-- A connection badge: connecting, live, reconnecting, offline.
+- Alert bounds set two ways. Auto keeps a 0.1% band and re-anchors it on each
+  fire; manual lets you type your own lines.
+- Text rules: type `BTC > 70000`, the app parses it with RegexBuilder and arms it.
+- A connection badge: connecting, live, reconnecting.
+
+History:
+
+- Fired alerts persist to SwiftData, so the feed survives a kill and restart.
+- Dedup by a unique event id; the list pages by time (keyset, not offset).
+
+News:
+
+- A crypto news feed with cursor pagination: scroll to the end and the next page
+  loads; pull down to refresh.
+- Runs on a bundled demo feed out of the box. Add a free key for live news (below).
+
+The domain layer also ships an on-device anomaly detector (a rolling z-score on
+log-returns) with tests.
+
+## News feed (optional API key)
+
+The News tab shows a bundled demo feed with no setup, so a fresh clone runs with
+news already on screen. For live news, add a free NewsData.io key:
+
+1. Get a free key at https://newsdata.io/register
+2. Copy the template next to it:
+   ```
+   cp DriftWatch/Secrets.example.plist DriftWatch/Secrets.plist
+   ```
+3. Open `DriftWatch/Secrets.plist` and paste your key into `NewsDataAPIKey`.
+4. Build and run. The app reads the key at runtime and switches to live news.
+
+`Secrets.plist` is gitignored, so the key never lands in the repo; without it the
+app falls back to the demo feed. A client key cannot be truly hidden in a shipped
+app, so this keeps the key out of the repository, not out of the binary. A real
+secret would sit behind a server proxy, and a user token would go to the Keychain.
 
 ## Why it exists
 
@@ -54,14 +91,17 @@ MainActor store to the SwiftUI screen.
 - The actor matches every armed rule. The hot path is synchronous, so it cannot
   be re-entered. Only the post-reconnect resync awaits, and that path is guarded.
 - Fired alerts and the latest price flow to the `@MainActor @Observable` store,
-  and the screen reads it.
+  and the screen reads it. Fired alerts also persist to SwiftData for the History
+  tab.
 
 ## Stack
 
 - iOS 18, Swift 6 with strict concurrency (`complete`)
 - SwiftUI with an `@Observable` store (MV, no view models)
 - Swift Concurrency: actors, `AsyncStream`, structured concurrency, `[weak self]`
+- SwiftData for the persisted alert history
 - Swift Charts for the price chart
+- RegexBuilder for the text-rule parser
 - Swift Package Manager: the domain is a local package, split from the app
 - Swift Testing for unit tests
 
@@ -75,8 +115,9 @@ cd DriftWatch
 open DriftWatch.xcodeproj
 ```
 
-Pick an iPhone simulator and run. No API key or account: it connects to the
-public Binance stream out of the box. To run the domain tests:
+Pick an iPhone simulator and run. No API key or account for the core: it connects
+to the public Binance stream out of the box, and the News tab shows the demo feed.
+To run the domain tests:
 
 ```
 cd DriftWatchKit
@@ -88,18 +129,20 @@ swift test
 The domain logic lives in a local Swift package (`DriftWatchKit`) so the compiler
 enforces the layer boundary: the domain cannot import SwiftUI or networking
 because it does not depend on them. The market data source sits behind a
-`PriceSource` protocol with two conformers, a live Binance one and a fake one
-that replays scripted ticks for tests and the SwiftUI preview.
+`PriceSource` protocol with two conformers, a live Binance one and a fake one that
+replays scripted ticks for tests and the SwiftUI preview. The news source sits
+behind a `NewsSource` protocol the same way, with a live and a demo conformer.
 
-The app layer is a single `@MainActor @Observable` store (`MarketStore`). It runs
-the source, feeds ticks to the engine, keeps a short price history for the chart,
-and exposes the band bounds the screen draws.
+The app layer holds small `@MainActor @Observable` stores. `MarketStore` runs the
+price source, feeds ticks to the engine, runs the reconnect resync, and exposes
+the band the chart draws. `NewsFeedStore` drives cursor pagination. App files are
+grouped by role: App, Models, Services, Stores, Views.
 
 ## Reliability
 
 The live source reconnects on its own. `connect()` runs a loop: open the socket,
 read frames until the stream drops, then wait a backoff delay and reopen. It stops
-only when the consumer cancels.
+and closes the socket when the consumer cancels.
 
 The delay uses capped exponential backoff with full jitter, the AWS approach. The
 ceiling doubles each attempt from 0.5s up to a 30s cap, and the real delay is a
@@ -118,33 +161,32 @@ The wait runs on an injected `Clock`. The app passes the real `ContinuousClock`;
 test can pass a clock that sleeps instantly, so the reconnect logic stays testable
 without real delays.
 
-This already handles the common cases. Any read error ends the loop body and
-triggers a backoff and retry, including the 24-hour server cut and the
-`serverShutdown` notice Binance sends before a planned close.
-
 Scoped, not built yet:
 
 - A ping/pong watchdog for a half-open socket, where `receive()` blocks with no
-  error because the connection is dead but the OS has not noticed. Send a ping
-  every 20s and treat a missing pong as a drop.
+  error because the connection is dead but the OS has not noticed.
 - Explicit close-code handling, so a close we started does not trigger a retry.
   Today cancellation already stops the loop, which covers the app-initiated case.
 
 ## Tests
 
-`swift test` runs 30 tests with Swift Testing. They cover rule matching for each
+`swift test` runs 44 tests with Swift Testing. They cover rule matching for each
 comparator, the armed-to-triggered transition, the reentrancy case (a live tick
 during the REST resync await must win, so the rule fires once and the stale resync
-is dropped), and the backoff schedule with its jitter range. The fake source
-injects reconnects and scripted prices, so the tests stay deterministic with no
-network.
+is dropped), the backoff schedule with its jitter range, the RegexBuilder DSL
+(positive cases and the negative cases for bad input), and the z-score detector
+(spike, steady trend, flat feed, cooldown). The fake source injects reconnects and
+scripted prices, so the tests stay deterministic with no network.
 
 ## Roadmap
 
 - [x] Reconnect loop with full-jitter backoff (0.5-30s cap)
+- [x] SwiftData feed: fired alerts with dedup and keyset paging
+- [x] On-device anomaly detector (rolling z-score)
+- [x] RegexBuilder text rules
+- [x] Paginated news feed with a demo fallback
 - [ ] Ping/pong watchdog and close-code handling for a half-open socket
-- [ ] SwiftData feed: store fired alerts with dedup and keyset paging
-- [ ] On-device anomaly detector (rolling z-score)
+- [ ] Percent-move rule matching in the engine
 - [ ] CI: GitHub Actions for build, `swift test`, and `swift format` lint
 
 ## License
