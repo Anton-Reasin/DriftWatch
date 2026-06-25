@@ -13,6 +13,7 @@ struct PriceView: View {
                 priceHeader
                 overviewCard
                 BoundsEditor(store: store)
+                TextRuleEditor(store: store)
                 alertsCard
             }
             .padding()
@@ -371,6 +372,59 @@ private extension View {
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .shadow(color: .cyan.opacity(0.22), radius: 18)
             .shadow(color: .white.opacity(0.06), radius: 8)
+    }
+}
+
+// MARK: - Text rule editor
+
+private struct TextRuleEditor: View {
+    let store: MarketStore
+
+    @State private var text = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Text rule")
+                .font(.headline)
+            HStack(spacing: 12) {
+                TextField("BTC > 70000", text: $text)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.characters)
+                    .onSubmit(add)
+                Button("Add", action: add)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if let error = store.ruleError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            if let notice = store.ruleNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !store.textRules.isEmpty {
+                ForEach(store.textRules, id: \.self) { rule in
+                    Text(rule)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.cyan)
+                }
+            }
+        }
+        .glowCard()
+    }
+
+    private func add() {
+        let input = text
+        Task {
+            await store.addTextRule(input)
+            if store.ruleError == nil {
+                text = ""
+            }
+        }
     }
 }
 
