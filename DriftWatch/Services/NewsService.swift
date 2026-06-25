@@ -1,14 +1,29 @@
 import Foundation
 
+/// Why a news request could not be made.
+enum NewsError: LocalizedError {
+    /// No NewsData.io key was found in Secrets.plist.
+    case missingAPIKey
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAPIKey:
+            "No NewsData.io key. Copy Secrets.example.plist to Secrets.plist and add your key."
+        }
+    }
+}
+
 /// Loads crypto news from NewsData.io, one page at a time via the API cursor.
 struct NewsService {
-    // TODO: move the key to an xcconfig before committing. Keyless demo comes later.
-    private let apiKey = "pub_3d73f8bed83f4c8cbfca48e7e1ddb3d9"
+    // Read from a gitignored Secrets.plist so the key stays out of the repo.
+    // See Secrets.example.plist and the README for setup.
+    private let apiKey = AppSecrets.newsDataAPIKey
     private let endpoint = "https://newsdata.io/api/1/crypto"
 
     /// Fetches one page. Pass `nil` for the first page, or the previous page's
     /// cursor to get the next one.
     func page(cursor: String?) async throws -> NewsPage {
+        guard let apiKey else { throw NewsError.missingAPIKey }
         guard var components = URLComponents(string: endpoint) else {
             throw URLError(.badURL)
         }
